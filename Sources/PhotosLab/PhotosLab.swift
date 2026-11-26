@@ -72,8 +72,15 @@ struct AssetRecord: Identifiable {
                     Text("Images: \(model.assets.count)").accessibilityIdentifier("library.count")
                     Button("Load library") { Task { await model.reload() } }.accessibilityIdentifier("library.load")
                     Button("Create QA album") { Task { await model.createAlbum() } }.accessibilityIdentifier("library.album")
-                    List(model.assets) { asset in
-                        Text("\(asset.width) × \(asset.height)")
+                    // Nine or more simulator assets can exceed the visible list area.
+                    // Use a non-lazy stack so fixture labels remain discoverable by XCTest.
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(model.assets) { asset in
+                                Text("\(asset.width) × \(asset.height)")
+                                    .accessibilityIdentifier("asset.\(asset.width)x\(asset.height)")
+                            }
+                        }
                     }.accessibilityIdentifier("library.assets")
                 }.navigationTitle("Photos QA Lab")
             }
