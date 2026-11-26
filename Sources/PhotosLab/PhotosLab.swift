@@ -29,7 +29,17 @@ struct AssetRecord: Identifiable {
     @Published private(set) var status = "Not loaded"
     private let logger = Logger(subsystem: "org.portfolio.PhotosLab", category: "Library")
     func reload() async {
-        let auth = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        status = "Loading"
+        // A pre-authorized simulator should not invoke the permission request UI.
+        let current = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        logger.info("Photo library authorization before loading: \(current.rawValue)")
+        let auth: PHAuthorizationStatus
+        if current == .notDetermined {
+            status = "Awaiting photo permission"
+            auth = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        } else {
+            auth = current
+        }
         guard auth == .authorized || auth == .limited else {
             assets = []; status = "Access denied (\(auth.rawValue))"; logger.error("Photo library authorization status: \(auth.rawValue)"); return
         }
@@ -62,8 +72,15 @@ struct AssetRecord: Identifiable {
                     Text("Images: \(model.assets.count)").accessibilityIdentifier("library.count")
                     Button("Load library") { Task { await model.reload() } }.accessibilityIdentifier("library.load")
                     Button("Create QA album") { Task { await model.createAlbum() } }.accessibilityIdentifier("library.album")
-                    List(model.assets) { asset in
-                        Text("\(asset.width) × \(asset.height)")
+                    // Nine or more simulator assets can exceed the visible list area.
+                    // Use a non-lazy stack so fixture labels remain discoverable by XCTest.
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(model.assets) { asset in
+                                Text("\(asset.width) × \(asset.height)")
+                                    .accessibilityIdentifier("asset.\(asset.width)x\(asset.height)")
+                            }
+                        }
                     }.accessibilityIdentifier("library.assets")
                 }.navigationTitle("Photos QA Lab")
             }
