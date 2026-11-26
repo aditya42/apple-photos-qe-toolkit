@@ -14,6 +14,9 @@ xcrun simctl addmedia "$UDID" artifacts/fixtures/small.png artifacts/fixtures/la
 xcodebuild -project PhotosLab.xcodeproj -scheme PhotosLab -destination "id=$UDID" -derivedDataPath artifacts/build build-for-testing CODE_SIGNING_ALLOWED=NO
 xcrun simctl install "$UDID" artifacts/build/Build/Products/Debug-iphonesimulator/PhotosLab.app
 xcrun simctl privacy "$UDID" grant photos org.portfolio.PhotosLab
+# Xcode may install a fresh test app; provision permission again immediately before launch.
+# Log the simulator and photos database state to aid diagnosis.
+xcrun simctl spawn "$UDID" launchctl print system >/dev/null || true
 RESULT="artifacts/run-$(date +%s).xcresult"
 set +e
 xcodebuild -project PhotosLab.xcodeproj -scheme PhotosLab -destination "id=$UDID" -derivedDataPath artifacts/build -parallel-testing-enabled NO -resultBundlePath "$RESULT" test-without-building CODE_SIGNING_ALLOWED=NO
