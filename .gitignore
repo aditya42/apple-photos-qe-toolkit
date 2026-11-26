@@ -1,0 +1,4 @@
+artifacts/
+.venv/
+*.xcodeproj/
+__pycache__/
