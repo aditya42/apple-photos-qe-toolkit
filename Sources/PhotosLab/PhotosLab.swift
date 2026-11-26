@@ -31,7 +31,7 @@ struct AssetRecord: Identifiable {
     func reload() async {
         let auth = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         guard auth == .authorized || auth == .limited else {
-            assets = []; status = "Access denied"; return
+            assets = []; status = "Access denied (\(auth.rawValue))"; logger.error("Photo library authorization status: \(auth.rawValue)"); return
         }
         let result = PHAsset.fetchAssets(with: .image, options: nil)
         var records: [AssetRecord] = []
