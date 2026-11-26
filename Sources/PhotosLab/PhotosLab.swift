@@ -1,0 +1,72 @@
+import SwiftUI
+import Photos
+import ImageIO
+import OSLog
+
+struct ImageMetadata: Equatable {
+    let width: Int
+    let height: Int
+    let orientation: Int
+    static func read(_ data: Data) throws -> Self {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = props[kCGImagePropertyPixelWidth] as? Int,
+              let height = props[kCGImagePropertyPixelHeight] as? Int else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return Self(width: width, height: height, orientation: props[kCGImagePropertyOrientation] as? Int ?? 1)
+    }
+}
+
+struct AssetRecord: Identifiable {
+    let id: String
+    let width: Int
+    let height: Int
+}
+
+@MainActor final class LibraryModel: ObservableObject {
+    @Published private(set) var assets: [AssetRecord] = []
+    @Published private(set) var status = "Not loaded"
+    private let logger = Logger(subsystem: "org.portfolio.PhotosLab", category: "Library")
+    func reload() async {
+        let auth = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        guard auth == .authorized || auth == .limited else {
+            assets = []; status = "Access denied"; return
+        }
+        let result = PHAsset.fetchAssets(with: .image, options: nil)
+        var records: [AssetRecord] = []
+        result.enumerateObjects { asset, _, _ in
+            records.append(.init(id: asset.localIdentifier, width: asset.pixelWidth, height: asset.pixelHeight))
+        }
+        assets = records.sorted { $0.id < $1.id }
+        status = "Loaded"
+        logger.info("Loaded \(records.count) image assets")
+    }
+    func createAlbum() async {
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: "PhotosLab QA")
+            }
+            status = "Album created"
+        } catch { status = "Album creation failed"; logger.error("Album creation failed") }
+    }
+}
+
+@main struct PhotosLabApp: App {
+    @StateObject private var model = LibraryModel()
+    var body: some Scene {
+        WindowGroup {
+            NavigationStack {
+                VStack {
+                    Text(model.status).accessibilityIdentifier("library.status")
+                    Text("Images: \(model.assets.count)").accessibilityIdentifier("library.count")
+                    Button("Load library") { Task { await model.reload() } }.accessibilityIdentifier("library.load")
+                    Button("Create QA album") { Task { await model.createAlbum() } }.accessibilityIdentifier("library.album")
+                    List(model.assets) { asset in
+                        Text("\(asset.width) × \(asset.height)")
+                    }.accessibilityIdentifier("library.assets")
+                }.navigationTitle("Photos QA Lab")
+            }
+        }
+    }
+}
