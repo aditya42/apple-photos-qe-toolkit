@@ -29,7 +29,17 @@ struct AssetRecord: Identifiable {
     @Published private(set) var status = "Not loaded"
     private let logger = Logger(subsystem: "org.portfolio.PhotosLab", category: "Library")
     func reload() async {
-        let auth = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        status = "Loading"
+        // A pre-authorized simulator should not invoke the permission request UI.
+        let current = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        logger.info("Photo library authorization before loading: \(current.rawValue)")
+        let auth: PHAuthorizationStatus
+        if current == .notDetermined {
+            status = "Awaiting photo permission"
+            auth = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        } else {
+            auth = current
+        }
         guard auth == .authorized || auth == .limited else {
             assets = []; status = "Access denied (\(auth.rawValue))"; logger.error("Photo library authorization status: \(auth.rawValue)"); return
         }
