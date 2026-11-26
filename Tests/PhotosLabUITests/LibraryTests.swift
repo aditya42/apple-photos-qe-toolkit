@@ -48,8 +48,16 @@ final class LibraryTests: XCTestCase {
             XCTFail("PhotoKit access state: \(status.label)")
             return
         }
-        XCTAssertEqual(app.staticTexts["library.count"].label, "Images: 3")
-        XCTAssertTrue(app.staticTexts["64 × 32"].firstMatch.exists)
+        // The Photos simulator may contain pre-existing assets. Validate that
+        // every seeded fixture exists without assuming an otherwise empty library.
+        let countLabel = app.staticTexts["library.count"].label
+        let imageCount = Int(countLabel.replacingOccurrences(of: "Images: ", with: ""))
+        XCTAssertNotNil(imageCount, "Unable to parse image count: \(countLabel)")
+        XCTAssertGreaterThanOrEqual(imageCount ?? 0, 3, "Expected at least the three seeded fixtures")
+        for dimensions in ["64 × 32", "640 × 480", "480 × 640"] {
+            XCTAssertTrue(app.staticTexts[dimensions].firstMatch.exists,
+                          "Missing seeded image with dimensions: \(dimensions)")
+        }
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.lifetime = .keepAlways
         add(attachment)
